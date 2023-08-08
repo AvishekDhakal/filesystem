@@ -10,55 +10,54 @@ class FileSystem:
         # self.current_directory = Directory('/', None, None, None)
         os.chdir(self.current_directory.path)
         self.home_directory = self.current_directory  # Initialize 
+
     
-    def resolve_path(self, path):
-        if isinstance(path, list):
-            path = os.path.join(*path)
-        if path.startswith('~'):
-            path = path.replace('~', self.home_directory.path, 1)
-        elif not path.startswith('/'):
-            path = os.path.join(self.current_directory.path, path)
-
-        parts = path.split('/')
-        new_parts = []
-        for part in parts:
-            if part == '..':
-                if new_parts:
-                    new_parts.pop()  # Go up to the parent directory
-            elif part and part != '.':
-                new_parts.append(part)  # Ignore empty parts and '.'
-
-        return '/' + '/'.join(new_parts)
-
-    def change_directory(self, path):
-        path = self.resolve_path(path)
-        try:
-            os.chdir(path)
-            self.current_directory = path
-            print(f'Successfully changed directory to {path}')
-        except FileNotFoundError:
-            print(f'Error: Directory "{path}" does not exist.')
-        except NotADirectoryError:
-            print(f'Error: "{path}" is not a directory.')
-        except PermissionError:
-            print(f'Error: Permission denied to change to directory "{path}".')
-        except Exception as e:
-            print(f'Error: Could not change directory to "{path}". {str(e)}')
     
     def mkfile():
+
         print("making")
+    
+    def resolve_path(self, path):
+        if isinstance(self.current_directory, Directory):
+            self.current_directory = self.current_directory.path
+        if isinstance(path, Directory):
+            path = path.path
+        if path == '.':
+            # Do nothing and return the current directory
+            return self.current_directory
+        elif path == '..':
+            # Go up one directory level
+            return os.path.dirname(self.current_directory)
+        elif path == '~' or path == '':
+            # Expand ~ or an empty string to the user's home directory
+            return os.path.expanduser('~')
+        else:
+            # For other cases, join the current directory with the given path
+            return os.path.join(self.current_directory, path)
+   
+    def change_directory(self, new_directory):
+
+        print(f"Changing directory: {new_directory}")
+
+        new_directory = self.resolve_path(new_directory)
+
+        try:
+            # If new_directory is a Directory object, get its path
+            if isinstance(new_directory, Directory):
+                new_directory = new_directory.path
+
+            os.chdir(new_directory)
+            self.current_directory = new_directory
+            print(f"Successfully changed directory to {self.current_directory}")
+        except Exception as e:
+            print(f"Error: {e}")
+
+
+
+
     
 
     
-    # def resolve_path(self, path):
-    #     if not path:
-    #         return self.current_directory
-    #     elif path == '~' or path.startswith('~/'):
-    #         return os.path.expanduser(path)
-    #     elif os.path.isabs(path):
-    #         return path
-    #     else:
-    #         return os.path.join(self.current_directory, path)
 
 
     def create_directory(self, directory, recursive=False):
@@ -115,16 +114,31 @@ class FileSystem:
             print(f'Error: Could not remove file "{filename}". {str(e)}')
 
 
-
-    def list_directory(self, long_format=False, show_hidden=False):
-
-        for filename in os.listdir('.'):
-            if filename.startswith('.') and not show_hidden:
-                continue
+    def list_directory(self, path='.', long_format=False, show_hidden=False):
+        resolved_path = self.resolve_path(path)
+        if os.path.isfile(resolved_path):
             if long_format:
-                self.print_file_info(filename)
+                self.print_file_info(resolved_path)
             else:
-                print(filename)
+                print(os.path.basename(resolved_path))
+        else:
+            for filename in os.listdir(resolved_path):
+                if filename.startswith('.') and not show_hidden:
+                    continue
+                if long_format:
+                    self.print_file_info(os.path.join(resolved_path, filename))
+                else:
+                    print(filename)
+   
+    # def list_directory(self, path='.', long_format=False, show_hidden=False):
+    #     resolved_path = self.resolve_path(path)
+    #     for filename in os.listdir(resolved_path):
+    #         if filename.startswith('.') and not show_hidden:
+    #             continue
+    #         if long_format:
+    #             self.print_file_info(os.path.join(resolved_path, filename))
+    #         else:
+    #             print(filename)
 
     def print_file_info(self, filename):
         info = os.stat(filename)
@@ -147,19 +161,8 @@ class FileSystem:
             print(f'Error: File "{source}" does not exist.')
         except Exception as e:
             print(f'Error: Could not move file "{source}" to "{destination}". {str(e)}')
-    
-    def rename_file(self, old_name, new_name):
-        filename = self.resolve_path(filename)
-        try:
-            os.rename(old_name, new_name)
-            print(f'Successfully renamed {old_name} to {new_name}')
-        except FileNotFoundError:
-            print(f'Error: File "{old_name}" does not exist.')
-        except Exception as e:
-            print(f'Error: Could not rename file "{old_name}" to "{new_name}". {str(e)}')
 
     def print_working_directory(self):
-        # directory = self.resolve_path(directory)
         print(os.getcwd())
     
     def copy(self, source, destination):
@@ -185,3 +188,79 @@ class FileSystem:
             os.system("cls")
         else:
             os.system("clear")
+
+    def change_permission(self, filename, permission):
+        filename = self.resolve_path(filename)
+        try:
+            os.chmod(filename, int(permission, 8))  # Convert permission to an integer base 8
+            print(f'Successfully changed permissions of {filename} to {permission}')
+        except Exception as e:
+            print(f'Error: Could not change permissions of "{filename}". {str(e)}')
+
+    def change_owner_group(self, filename, owner, group):
+        filename = self.resolve_path(filename)
+        try:
+            uid = pwd.getpwnam(owner).pw_uid
+            gid = grp.getgrnam(group).gr_gid
+            os.chown(filename, uid, gid)
+            print(f'Successfully changed owner/group of {filename} to {owner}:{group}')
+        except Exception as e:
+            print(f'Error: Could not change owner/group of "{filename}". {str(e)}')
+
+    def show_stats(self, filename):
+        filename = self.resolve_path(filename)
+        try:
+            stat_info = os.stat(filename)
+            
+            print(f'Statistics for {filename}:')
+            print(f'File Type: {self.get_file_type(stat_info.st_mode)}')
+            print(f'Size: {stat_info.st_size} bytes')
+            print(f'Permissions: {oct(stat.S_IMODE(stat_info.st_mode))}')
+            print(f'Owner ID: {stat_info.st_uid}')
+            print(f'Group ID: {stat_info.st_gid}')
+            print(f'Number of Hard Links: {stat_info.st_nlink}')
+            print(f'Last Modified: {time.ctime(stat_info.st_mtime)}')
+            print(f'Last Accessed: {time.ctime(stat_info.st_atime)}')
+            print(f'Last Metadata Change: {time.ctime(stat_info.st_ctime)}')
+        except Exception as e:
+            print(f'Error: Could not retrieve statistics for "{filename}". {str(e)}')
+
+    def get_file_type(self, mode):
+        if stat.S_ISDIR(mode):
+            return 'Directory'
+        elif stat.S_ISREG(mode):
+            return 'Regular File'
+        elif stat.S_ISLNK(mode):
+            return 'Symbolic Link'
+        # Add more types as needed
+        else:
+            return 'Unknown'
+    
+    def edit_file(self, filename):
+        filename = self.resolve_path(filename)
+        try:
+            with open(filename, 'r') as f:
+                print(f.read())
+            new_content = input("Enter new content for file: ")
+            with open(filename, 'w') as f:
+                f.write(new_content)
+            print(f'Successfully edited {filename}')
+        except FileNotFoundError:
+            print(f'Error: File "{filename}" does not exist.')
+        except PermissionError:
+            print(f'Error: Permission denied for editing "{filename}".')
+        except Exception as e:
+            print(f'Error: Could not edit file "{filename}". {str(e)}')
+
+    def write_to_file(self, message, filename, mode):
+        filename = self.resolve_path(filename)
+        try:
+            with open(filename, mode) as f:
+                f.write(message + '\n')
+            print(f'Successfully wrote to {filename}')
+        except FileNotFoundError:
+            print(f'Error: File "{filename}" does not exist.')
+        except PermissionError:
+            print(f'Error: Permission denied for writing to "{filename}".')
+        except Exception as e:
+            print(f'Error: Could not write to file "{filename}". {str(e)}')
