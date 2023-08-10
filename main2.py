@@ -21,6 +21,10 @@ command_usage = {
 
 
 def main():
+    """
+    The main function is a command-line interface that allows users to interact with a file system by
+    entering various commands.
+    """
     fs = FileSystem()
     while True:
         try:
@@ -112,23 +116,51 @@ def main():
 
             
             elif command_name == 'cat':
-                filename = parts[1]
-                if '>' in parts or '>>' in parts:
-                    if '>' in parts:
-                        index = parts.index('>')
-                        mode = 'w'  # Overwrite file
+                if len(parts) < 2:
+                    print('Error: The cat command requires a filename argument.')
+                elif len(parts) >= 4:
+                        print("Error: The cat -e only accetps one file at a time.")
+                elif parts[1] == '-e':
+                    if len(parts) < 3:
+                        print('Error: The cat -e command requires a filename argument.')
+                    elif len(parts) >= 4:
+                        print("Error: The cat -e only accetps one file at a time.")
                     else:
-                        index = parts.index('>>')
-                        mode = 'a'  # Append to file
+                        # elif '-e' in parts:
+                        fs.edit_file_interactive(parts[2])
+                elif '>' in parts:
+                    index = parts.index('>')
                     message = parts[index - 1]
                     output_file = parts[index + 1]
-                    fs.write_to_file(message, output_file, mode)
+                    fs.edit_file(output_file, message)
+                elif '>>' in parts:
+                    index = parts.index('>>')
+                    message = parts[index - 1]
+                    output_file = parts[index + 1]
+                    with open(fs.resolve_path(output_file), 'a') as f:
+                        f.write(message + '\n')
                 else:
-                    fs.edit_file(filename)
+                    fs.edit_file(parts[1])
+            
             elif command_name == 'help':
                 for usage in command_usage.values():
                     print(usage)
                 continue
+            
+            elif command_name == 'gzip':
+                fs.gzip(parts)
+
+            elif command_name == 'du':
+                fs.disk_usage(args[0] if args else '.')
+            # else:
+            #     print(f'Unknown command: {command_name}')
+
+            elif command_name == 'search':
+                if len(args) < 1:
+                    print(f'Error: The {command_name} command requires at least one argument.')
+                else:
+                    fs.search(args[0], args[1] if len(args) > 1 else '.')
+
             else:
                 print(f'Unknown command: {command_name}')
 
